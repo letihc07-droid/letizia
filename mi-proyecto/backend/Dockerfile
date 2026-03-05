@@ -1,18 +1,25 @@
-# Usa una imagen ligera de Node
-FROM node:18-alpine
+FROM python:3.12-slim
 
-# Crea el directorio de trabajo
+ENV PYTHONDONTWRITEBYTECODE=1 \
+    PYTHONUNBUFFERED=1
+
 WORKDIR /app
 
-# Copia los archivos de dependencias y las instala
-COPY package*.json ./
-RUN npm install
+COPY requirements.txt .
+RUN pip install --no-cache-dir -r requirements.txt
 
-# Copia el resto del código
-COPY . .
+RUN mkdir -p /app/data && \
+    addgroup --system appgroup && \
+    adduser  --system --ingroup appgroup appuser && \
+    chown -R appuser:appgroup /app
 
-# Expone el puerto que usa tu app
-EXPOSE 3000
+COPY --chown=appuser:appgroup . .
 
-# Comando para arrancar la app
-CMD ["node", "app.js"]
+USER appuser
+
+EXPOSE 5000
+
+HEALTHCHECK --interval=30s --timeout=10s --start-period=20s --retries=3 \
+  CMD python -c "import urllib.request; urllib.request.urlopen('http://localhost:5000/api/health')" || exit 1
+
+CMD ["python", "app.py"]
